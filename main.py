@@ -1,8 +1,6 @@
 from src.database import Database, Data
 import atexit
 
-
-
 my_redis: Database = Database('my_db')
 
 try:
@@ -17,8 +15,9 @@ from faker import Faker
 
 f = Faker()
 
-for _ in range(10000000):
+for _ in range(1000):
     try:
+        break
         my_redis.insert_into_scheme('users', Data(f.name(), f.email()))
     except KeyboardInterrupt:
         break
@@ -34,3 +33,4 @@ def at_exit() -> None:
     my_redis.close()
 
 atexit.register(at_exit)
+
