@@ -1,5 +1,17 @@
 from typing import List
 
+types: dict = {
+    'int': int,
+    'float': float,
+    'str': str,
+    'bool': bool
+}
+
+booleans: dict = {
+    'True': True,
+    'False': False
+}
+
 class Int:
     def __init__(self, value: int) -> None:
         if type(value) != int: raise Exception
