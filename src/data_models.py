@@ -4,7 +4,13 @@ types: dict = {
     'int': int,
     'float': float,
     'str': str,
-    'bool': bool
+    'bool': bool,
+    'list': list,
+    'dict': dict,
+    'tuple': tuple,
+    'set': set,
+    'frozenset': frozenset,
+    'None': None
 }
 
 booleans: dict = {
