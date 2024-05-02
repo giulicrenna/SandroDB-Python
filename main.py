@@ -142,6 +142,7 @@ class Interpreter(Thread):
                     args=(parsed['scheme'], parsed['key']),
                     daemon=True).start()
                 
+            
             else:
                 Logger.print_log_warning(f'Invalid command: {command_name}')
                 return

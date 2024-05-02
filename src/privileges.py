@@ -32,7 +32,7 @@ class Privileges:
         return "[USER PRIVILEGES] " + " ".join(f"{prop}:{value}" for prop, value in properties.items() if isinstance(value, bool))
             
 """
-Each databese scheme has it's own privileges scheme.
+Each database scheme has it's own privileges scheme.
 """
 class PrivilegesScheme:
     def __init__(self) -> None:
