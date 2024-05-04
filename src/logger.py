@@ -31,5 +31,5 @@ class Logger:
         print(Color.YELLOW + f'[WARNING]' + Color.END + f': {log}')
         
     @staticmethod
-    def print_database_output(log: str) -> None:
-        print(Color.BLUE + f'[DATABASE]' + Color.END + f': {log}')
+    def print_database_output(state: str, log: str) -> None:
+        print(Color.BLUE + f'[DATABASE]' + Color.END + Color.GREEN + f' <{state}>' + Color.END + f': {log}')

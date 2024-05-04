@@ -1,14 +1,15 @@
 from src.privileges import Privileges, PrivilegesScheme
-from src.user import User, UserScheme
+from src.user import User, UserScheme, calculate_sha256
 from src.data_models import *
 from src.exceptions import *
 from src.dumper import *
 from src.utils import getsize, threaded
+from src.logger import Logger
 from typing import Dict, Tuple
 import sys
 import os
 
-FORMAT: str = "MKDB"
+FORMAT: str = "SDB"
 
 mb_to_bytes = lambda mb_: mb_ * 1024**2
 bytes_to_mb = lambda bytes_: bytes_ / 1024**2 
@@ -110,10 +111,10 @@ class SchemeTable:
         
 class Database:
     def __init__(self,
-                 db_name: str,
-                 memory_scheme_size_mb: int,
-                 user: str,
-                 password: str) -> None:
+                db_name: str,
+                memory_scheme_size_mb: int,
+                user: str,
+                password: str) -> None:
         self.db_name = db_name
         self.memory_size_mb = memory_scheme_size_mb
         self.privileges_scheme: PrivilegesScheme = PrivilegesScheme()
@@ -123,7 +124,7 @@ class Database:
         self.check_root()
         
         self.schemes_table: SchemeTable = SchemeTable(user=self.user,
-                                                      privileges_scheme=self.privileges_scheme)
+                                                    privileges_scheme=self.privileges_scheme)
         self.current_user_privileges: Privileges = self.privileges_scheme.get_privileges(user=self.user)
         
         self.load_state()
@@ -147,7 +148,10 @@ class Database:
             
             self.privileges_scheme.add_privilege(user=root,
                                                   privileges=root_privileges)
-    
+        
+        if self.user_scheme.get_user(name='root').password == calculate_sha256('root'):
+            Logger.print_log_warning('change root password for better security.')
+        
     def load_state(self):
         file_path: str = os.path.join('internal', f'{self.db_name}.{FORMAT}')
         

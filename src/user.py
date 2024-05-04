@@ -49,13 +49,6 @@ class UserScheme:
     def get_all_users_names(self) -> List[str]:
         return [user.name for user in self.users]
     
-    def get_user_by_name(self, name: str) -> User:
-        for user in self.users:
-            if user.name == name:
-                return user
-        
-        return None
-    
     def get_user_by_password(self, password: str) -> User:
         for user in self.users:
             if user.password == calculate_sha256(password):

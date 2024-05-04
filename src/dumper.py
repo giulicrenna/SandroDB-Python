@@ -11,6 +11,13 @@ def save(data_file_path: str,
     with open(data_file_path, 'wb') as db:
         pickle.dump(obj=database,
                     file=db)
+        
+def save_generic(data_file_path: str,
+         object: Database) -> None:
+ 
+    with open(data_file_path, 'wb') as obj:
+        pickle.dump(obj=object,
+                    file=obj)
     
 def load(data_file_path: str) -> Database | dict:
     if os.path.isfile(data_file_path):

@@ -73,3 +73,15 @@ class InvalidKeyType(Exception):
 class KeyNotFound(Exception):
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
+        
+class DatabaseAlreadyThere(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+        
+class DatabaseDoesNotExist(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+        
+class DatabaseDoNotSelected(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
