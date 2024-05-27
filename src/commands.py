@@ -15,7 +15,6 @@ class Commands:
         self.CREATE_SCHEME: tuple[str, str] = ('create_scheme', 'ARGS: [name]<str> [type1]<type> [type2]<type> [overwrite registry]<bool> - Creates a new scheme.')
         self.SHOW_SCHEMES: tuple[str, str] = ('show_schemes', 'Show all available schemes in selected database.')
         self.DEL_SCHEME: tuple[str, str] = ('del_scheme', 'ARGS: [name]<str> - Delete scheme.')
-        self.SHOW_ALL_SCHEMES: tuple[str, str] = ('show_all_schemes', 'Shows all available schemes in selected database.')
 
         self.INSERT_INTO: tuple[str, str] = ('insert_into', 'ARGS: [scheme name]<str> [key]<any> [value]<any> - Inserts a new record into a scheme.>')
         self.GET_REGISTRY: tuple[str, str] = ('get_registry', 'ARGS: [scheme name]<str> [key]<any> - Gets a record from a scheme.')

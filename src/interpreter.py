@@ -152,7 +152,7 @@ class Interpreter(Thread):
         
     def run(self) -> None:
         if len(self.data_bases.databases.keys()) == 1:
-            Logger.print_log_warning('Setting up the unique database as default.')
+            Logger.print_log_warning('Setting up the unique database as selected.')
             self.current_db = self.data_bases.databases[list(self.data_bases.databases.keys())[0]]
             
         while True:
@@ -200,6 +200,9 @@ class Interpreter(Thread):
                 
                 if parsed is None:
                     DatabaseDoesNotExist
+                
+                if not parsed['name'] in self.data_bases.databases.keys():
+                    raise DatabaseDoesNotExist
                 
                 self.current_db = self.data_bases.databases[parsed['name']]
             
@@ -368,6 +371,10 @@ class Interpreter(Thread):
         except DatabaseDoNotSelected:
             Logger.print_log_error(f'Database not selected', 'interpretate')
             return
+        
+        except DatabaseDoesNotExist:
+            Logger.print_log_error(f'Database does not exist', 'interpretate')
+            return
 
         except KeyError:
             Logger.print_log_error(f'Bad command usage, check help.', 'interpretate')
@@ -379,10 +386,10 @@ class Interpreter(Thread):
 
     def get_schemes_name(self) -> None:
         if self.current_db == None:
-            Logger.print_log_error('Database not setted', 'get_all_schemes')
+            Logger.print_log_error('Database not selected', 'get_all_schemes')
             return
         
-        self.messages.put(str(self.current_db.schemes_table._schemes.keys()))
+        self.messages.put(str(list(self.current_db.schemes_table._schemes.keys())))
     
     def get_registry(self, scheme_name: str, key: str) -> None:
         if self.current_db == None:
