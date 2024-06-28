@@ -1,4 +1,6 @@
-[SandroDB](https://github.com/giulicrenna/SandroDB-Python/blob/main/static/icon.png)
+
+![SandroDB](https://raw.githubusercontent.com/giulicrenna/SandroDB-Python/main/static/icon.png)
+
 
 ## SandroDB
 
