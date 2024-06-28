@@ -9,7 +9,7 @@ import atexit
 create_scheme users str str True 1024
 create_scheme clients str str True 1024
 create_scheme cars str str False 1024
-get_all_schemes 
+show_schemes
 insert_into users usuario1 123
 insert_into clients usuario1 123
 insert_into cars audi 123
