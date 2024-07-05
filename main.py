@@ -1,7 +1,7 @@
 from src.database import Database
 from src.data_models import types, booleans
 from src.exceptions import *
-from src.interpreter import Interpreter
+from src.core import Interpreter
 from src.logger import Logger
 import atexit
 

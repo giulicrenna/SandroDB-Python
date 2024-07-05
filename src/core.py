@@ -1,6 +1,8 @@
 from src.database import Database, Data, Scheme
 from src.data_models import types, booleans
 from src.exceptions import *
+from src.user import User, UserScheme
+from src.privileges import Privileges
 from src.dumper import save, load, save_generic
 from src.logger import Logger
 from src.commands import Commands
@@ -11,33 +13,32 @@ import json
 
 COMM: Commands = Commands()
 
+Logger.print_log_normal(log='Database started succesfully', instance='main')
+
 class Databases:
     def __init__(self) -> None:
-        self.databases: dict = {}
+        self.databases: dict = self.load_databases()
 
-    def add_database(self, database_name: str, database: Database) -> None:
-        if database_name in self.databases.keys():
-            raise DatabaseAlreadyThere
-        
-        self.databases[database_name] = database
+    def load_databases(self) -> list[str]:
+        return [db.split('.')[0] for db in os.listdir(os.path.join(os.getcwd(), 'internal')) if db != 'core.property']
 
-    def get_database(self, database_name: str) -> Database:
-        if database_name not in self.databases.keys():
+    def get_database(self, database_name: str, user: User) -> Database:
+        if database_name not in self.databases:
             raise DatabaseDoesNotExist
 
-        return self.databases[database_name]
+        return Database(db_name=database_name, user=user)
 
     def remove_database(self, database_name: str) -> None:
-        if database_name not in self.databases.keys():
+        if database_name not in self.databases:
             raise DatabaseDoesNotExist
 
         del self.databases[database_name]
 
     def get_all_databases(self) -> list:
-        return list(self.databases.keys())
+        return self.databases
 
     def get_database_size(self, database_name: str) -> int:
-        if database_name not in self.databases.keys():
+        if database_name not in self.databases:
             raise DatabaseDoesNotExist
 
         return self.databases[database_name].get_size()
@@ -65,14 +66,6 @@ class Databases:
             raise DatabaseDoesNotExist
 
         return self.databases[database_name].get_scheme_max_size(scheme_name)
-    
-    def close_all(self) -> None:
-        for database in self.databases.values():
-            database.close()
-
-my_redis: Database = Database('my_db', 2048, 'root', 'root')
-
-Logger.print_log_normal(log='Database started succesfully', instance='main')
 
 class Parser:
     @staticmethod
@@ -116,14 +109,13 @@ class Parser:
     
     @staticmethod
     def parse_add_new_database(command_args: list) -> dict:
-        if len(command_args) != 2:
+        if len(command_args) != 1:
             Logger.print_log_error('Invalid number of arguments for add_new_database command', 'parse_add_new_database')
             return
         
         try:
             return {
                 'name': command_args[0],
-                'size': int(command_args[1])
             }
         except Exception as e:
             Logger.print_log_error('Invalid arguments for add_new_database command', 'parse_add_new_database')
@@ -138,23 +130,34 @@ class Parser:
         return {
             'name': command_args[0]
         }
+        
+    @staticmethod 
+    def parse_login(command_args: list) -> dict:
+        if len(command_args) != 2:
+            Logger.print_log_error('Invalid number of arguments for use_database command', 'parse_use_database')
+            return
+        
+        return {
+            'username': command_args[0],
+            'password': command_args[1]
+        }
 
     
 class Interpreter(Thread):
     def __init__(self) -> None:
         super().__init__()
+        self.user_scheme: UserScheme = UserScheme()
+        self._user: User = None
         
-        self.messages: Queue = Queue()
-        self.data_bases: Databases = self.load_databases()
-        self.current_db: Database | None = None
+        self._messages: Queue = Queue()
+        self._data_bases: Databases = Databases()
+        self._current_db: Database | None = None
         
         Thread(target=self.output_thread, daemon=True).start()
         
+        self.load_state()
+        
     def run(self) -> None:
-        if len(self.data_bases.databases.keys()) == 1:
-            Logger.print_log_warning('Setting up the unique database as selected.')
-            self.current_db = self.data_bases.databases[list(self.data_bases.databases.keys())[0]]
-            
         while True:
             command_args: list = input('\n> ').split(' ')
             
@@ -165,12 +168,106 @@ class Interpreter(Thread):
             self.interpretate(command_name=command_name,
                                 args=args)
     
+    def add_user(self, user_name: str,
+                 password: str) -> None:
+        if not self.current_user_privileges.ADD_USER:
+            raise NotEnoughPrivileges
+        
+        new_user: User = User(name=user_name)
+        new_user.set_password(password=password)
+        self.user_scheme.add_user(user=new_user)
+        self.privileges_scheme.add_privileges(user=new_user,
+                                              privileges=Privileges())
+    
+    def delete_user(self, user: User) -> None:
+        if not self.current_user_privileges.DEL_USER:
+            raise NotEnoughPrivileges
+        
+        self.user_scheme.remove_user(user=user)
+
+    def get_schemes_name(self) -> None:
+        if self._current_db == None:
+            Logger.print_log_error('Database not selected', 'get_all_schemes')
+            return
+        
+        self._messages.put(str(list(self._current_db.schemes_table._schemes.keys())))
+    
+    def get_registry(self, scheme_name: str, key: str) -> None:
+        if self._current_db == None:
+            Logger.print_log_error('Database not setted', 'get_registry')
+            return
+        try:
+            self._messages.put(self._current_db.get_registry(scheme_name, key))        
+        except KeyNotFound:
+            Logger.print_log_error(f'Key {key} does not exist', 'get_registry')
+            return
+        except InvalidSchemeName:
+            Logger.print_log_error(f'Scheme {scheme_name} does not exist', 'get_registry')
+            return
+        
+    def get_all_schemes(self) -> None:
+        if self._current_db == None:
+            Logger.print_log_error('Database not setted', 'get_all_schemes')
+            return
+        
+        self._messages.put(str(self._current_db.read_all_schemes()))
+    
+    def output_thread(self) -> None:
+        while True:
+            if not self._messages.empty():
+                if self._current_db != None:
+                    Logger.print_database_output(self._current_db.db_name, self._messages.get())
+                else:
+                    Logger.print_database_output('', self._messages.get())
+    
+    def save_databases_stack(self) -> None:
+        internal_path = os.path.join(os.getcwd(), 'internal', 'core.property')
+        
+        state = self.__dict__.copy()
+        
+        for key in list(state.keys()):
+            if key[0] == '_':
+                del(state[key])
+        
+        save_generic(internal_path, state)
+    
+    def load_state(self):
+        file_path: str = os.path.join('internal', 'core.property')
+        
+        if not  os.path.isfile(file_path): return
+         
+        states: dict = load(file_path)
+        
+        self.__dict__.update(states)
+    
+    def at_close(self) -> None:
+        Logger.print_log_warning('Closing database')
+        
+        self.save_databases_stack()
+        if self._current_db is not None:
+            self._current_db.close()
+    
     def interpretate(self, command_name: str, args: list) -> None:
         try:
             if command_name == COMM.EXIT[0]:
                 exit(0)
+                
+            if command_name == COMM.LOGIN[0]:
+                parsed: dict = Parser.parse_login(args)
+                
+                if parsed is None:
+                    return
+                
+                self._user = self.user_scheme.get_user(name=parsed['username'],
+                                                       password=parsed['password'])
+                
+                return
+                
+            if self._user is None:
+                Logger.print_log_error('Must login', 'core')
+                return
             
-            elif command_name == COMM.HELP[0]:
+            if command_name == COMM.HELP[0]:
                 COMM.show_help()
             
             elif command_name == COMM.CLEAR[0]:
@@ -178,7 +275,7 @@ class Interpreter(Thread):
                 return
             
             elif command_name == COMM.DEBUG[0]:
-                self.messages.put('DEBUG')           
+                self._messages.put('DEBUG')           
             # Here below are all the database control commands
             
             elif command_name == COMM.CREATE_DB[0]:
@@ -187,32 +284,34 @@ class Interpreter(Thread):
                 if parsed is None:
                     return
                 
-                new_db: Database = Database(parsed['name'],
-                                parsed['size'],
-                                'root',
-                                'root')
+                Database(db_name = parsed['name'], user=self._user).close()
                 
-                self.data_bases.add_database(database_name=parsed['name'],
-                                            database=new_db)          
-            
             elif command_name == COMM.USE_DB[0]:
                 parsed: dict = Parser.parse_use_database(args)
                 
-                if parsed is None:
-                    DatabaseDoesNotExist
+                databases: Databases = Databases()
                 
-                if not parsed['name'] in self.data_bases.databases.keys():
+                if parsed is None:
+                    DatabaseDoesNotExist # change this
+                
+                if not parsed['name'] in databases.databases:
                     raise DatabaseDoesNotExist
                 
-                self.current_db = self.data_bases.databases[parsed['name']]
+                if self._current_db is not None:
+                    self._current_db.close()                
+
+                self._current_db = self._data_bases.get_database(database_name=parsed['name'],
+                                                                 user=self._user)
             
             elif command_name == COMM.SHOW_DATABASES[0]:
                 available_databases: str = '\nAvailable databases: '
                 
-                for database_name in self.data_bases.databases.keys():
+                databases: Databases = Databases()                
+                
+                for database_name in databases.databases:
                     available_databases += f'\n{database_name}'
                 
-                self.messages.put(available_databases)
+                self._messages.put(available_databases)
                  
             # Here below all the scheme and registry control commands are implemented
             elif command_name == COMM.CREATE_SCHEME[0]:
@@ -221,10 +320,10 @@ class Interpreter(Thread):
                 if parsed is None:
                     return
                 
-                if self.current_db is None:
+                if self._current_db is None:
                     raise DatabaseDoNotSelected
                 
-                self.current_db.add_scheme(parsed['name'],
+                self._current_db.add_scheme(parsed['name'],
                                     parsed['type1'],
                                     parsed['type2'],
                                     parsed['overwrite'],
@@ -236,15 +335,15 @@ class Interpreter(Thread):
                 if parsed is None:
                     return
                 
-                if self.current_db is None:
+                if self._current_db is None:
                     raise DatabaseDoNotSelected
                 
                 scheme_name: str = parsed['scheme']
                 
-                if not scheme_name in self.current_db.schemes_table._schemes.keys():
+                if not scheme_name in self._current_db.schemes_table._schemes.keys():
                     raise InvalidSchemeName
                 
-                scheme: Scheme = self.current_db.schemes_table._schemes[scheme_name]
+                scheme: Scheme = self._current_db.schemes_table._schemes[scheme_name]
                 
                 key_type, value_type = scheme._key_type, scheme._vals_type
                 
@@ -264,7 +363,7 @@ class Interpreter(Thread):
                     Logger.print_log_error(f'Invalid type for key or value', 'set_registry')
                     return
                 
-                self.current_db.insert_into_scheme(parsed['scheme'],
+                self._current_db.insert_into_scheme(parsed['scheme'],
                                             Data(parsed['key'], parsed['value']))
                     
             elif command_name == COMM.SHOW_SCHEMES[0]:
@@ -281,8 +380,7 @@ class Interpreter(Thread):
                 
                 Thread(target=self.get_registry,
                     args=(parsed['scheme'], parsed['key']),
-                    daemon=True).start()
-                
+                    daemon=True).start()               
             
             else:
                 Logger.print_log_warning(f'Invalid command: {command_name}')
@@ -380,60 +478,24 @@ class Interpreter(Thread):
             Logger.print_log_error(f'Bad command usage, check help.', 'interpretate')
             return
         
-    def load_databases_at_startup(self) -> None:
-        databases_path = os.path.join(os.getcwd(), '')
-        save()
+        except KeyboardInterrupt:
+            Logger.print_log_normal('Keyboard interrupt', 'interpretate')
+            exit()
+        
+        except DatabaseDoNotSelected:
+            Logger.print_log_error(f'Database not selected', 'interpretate')
+            return
+        
+        except DatabaseDoesNotExist:
+            Logger.print_log_error(f'Database does not exist', 'interpretate')
+            return
 
-    def get_schemes_name(self) -> None:
-        if self.current_db == None:
-            Logger.print_log_error('Database not selected', 'get_all_schemes')
+        except KeyError:
+            Logger.print_log_error(f'Bad command usage, check help.', 'interpretate')
             return
         
-        self.messages.put(str(list(self.current_db.schemes_table._schemes.keys())))
-    
-    def get_registry(self, scheme_name: str, key: str) -> None:
-        if self.current_db == None:
-            Logger.print_log_error('Database not setted', 'get_registry')
-            return
-        try:
-            self.messages.put(self.current_db.get_registry(scheme_name, key))        
-        except KeyNotFound:
-            Logger.print_log_error(f'Key {key} does not exist', 'get_registry')
-            return
-        except InvalidSchemeName:
-            Logger.print_log_error(f'Scheme {scheme_name} does not exist', 'get_registry')
+        except Exception as e:
+            Logger.print_log_error(f'Unknown error: {e}', 'interpretate')
             return
         
-    def get_all_schemes(self) -> None:
-        if self.current_db == None:
-            Logger.print_log_error('Database not setted', 'get_all_schemes')
-            return
         
-        self.messages.put(str(self.current_db.read_all_schemes()))
-    
-    def output_thread(self) -> None:
-        while True:
-            if not self.messages.empty():
-                if self.current_db != None:
-                    Logger.print_database_output(self.current_db.db_name, self.messages.get())
-                else:
-                    Logger.print_database_output('', self.messages.get())
-    
-    def save_databases_stack(self) -> None:
-        internal_path = os.path.join(os.getcwd(), 'internal', 'db_stack.property')
-        
-        save_generic(internal_path, self.data_bases)
-    
-    def load_databases(self) -> Databases:
-        if not os.path.exists(os.path.join(os.getcwd(), 'internal', 'db_stack.property')):
-            return Databases()
-        
-        return load(os.path.join(os.getcwd(), 'internal', 'db_stack.property'))
-            
-    def at_close(self) -> None:
-        Logger.print_log_warning('Closing database')
-        
-        self.save_databases_stack()
-        self.data_bases.close_all()
-    
-    

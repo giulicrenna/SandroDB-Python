@@ -7,12 +7,12 @@ class Commands:
         self.HELP: tuple[str, str] = ('help', 'Show help.')
         self.DEBUG: tuple[str, str] = ('debug', '')
 
-        self.CREATE_DB: tuple[str, str] = ('create_db', f'ARGS: [name]<str> [size]<int> - Creates a new database.')
+        self.CREATE_DB: tuple[str, str] = ('create_db', f'ARGS: [name]<str> - Creates a new database.')
         self.USE_DB: tuple[str, str] = ('use_db', 'ARGS: [name]<str> - Select database to use.')
         self.SHOW_DATABASES: tuple[str, str] = ('show_databases', 'ARGS: [name]<str> - Select available databases.')
         self.EXIT_DB: tuple[str, str] = ('exit_db', 'ARGS: [name]<str> - Close database.')
     
-        self.CREATE_SCHEME: tuple[str, str] = ('create_scheme', 'ARGS: [name]<str> [type1]<type> [type2]<type> [overwrite registry]<bool> - Creates a new scheme.')
+        self.CREATE_SCHEME: tuple[str, str] = ('create_scheme', 'ARGS: [name]<str> [type1]<type> [type2]<type> [overwrite registry]<bool> [size]<int>- Creates a new scheme.')
         self.SHOW_SCHEMES: tuple[str, str] = ('show_schemes', 'Show all available schemes in selected database.')
         self.DEL_SCHEME: tuple[str, str] = ('del_scheme', 'ARGS: [name]<str> - Delete scheme.')
 

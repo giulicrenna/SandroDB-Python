@@ -71,12 +71,15 @@ class UserScheme:
         
         self.users.remove(user)
         
-    def get_user(self, name: str) -> User:
+    def get_user(self, name: str, password: str) -> User:
         if name not in self.get_all_users_names():
             raise UserDoesNotExist
         
         for user in self.users:
             if user.name == name:
-                return user
-        
+                if user.validate_password(password):
+                    return user
+                else:
+                    raise InvalidPasswordException
+                        
         return None

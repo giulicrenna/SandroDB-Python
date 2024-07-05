@@ -3,3 +3,4 @@
 *.MKDB
 *.SDB
 *.property
+/internal

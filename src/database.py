@@ -112,14 +112,11 @@ class SchemeTable:
 class Database:
     def __init__(self,
                 db_name: str,
-                memory_scheme_size_mb: int,
-                user: str,
-                password: str) -> None:
+                user: User
+                ) -> None:
+        self.user: User = user
         self.db_name = db_name
-        self.memory_size_mb = memory_scheme_size_mb
         self.privileges_scheme: PrivilegesScheme = PrivilegesScheme()
-        self.user_scheme: UserScheme = UserScheme()
-        self.user: User = self.user_scheme.get_user(user)
         
         self.check_root()
         
@@ -128,9 +125,6 @@ class Database:
         self.current_user_privileges: Privileges = self.privileges_scheme.get_privileges(user=self.user)
         
         self.load_state()
-        
-        if not self.user.validate_password(password):
-            raise InvalidPasswordException
         
         if not os.path.isdir('internal'):
             os.mkdir('internal')
@@ -141,15 +135,14 @@ class Database:
         return state
     
     def check_root(self) -> None:
-        if not "root" in self.privileges_scheme.get_all_users():
+        if not "root" in self.privileges_scheme.get_all_users() and self.user.name == "root":
             root_privileges = Privileges()
             root_privileges.make_root()
-            root: User = self.user_scheme.get_user("root")
             
-            self.privileges_scheme.add_privilege(user=root,
+            self.privileges_scheme.add_privilege(user=self.user,
                                                   privileges=root_privileges)
         
-        if self.user_scheme.get_user(name='root').password == calculate_sha256('root'):
+        if self.user.password == calculate_sha256('root'):
             Logger.print_log_warning('change root password for better security.')
         
     def load_state(self):
@@ -158,8 +151,6 @@ class Database:
         if not  os.path.isfile(file_path): return
          
         states: Dict = load(file_path)
-        
-        del(states['user'])
         
         self.__dict__.update(states)
 
@@ -187,20 +178,5 @@ class Database:
     def delete_scheme(self, scheme_name: str) -> None:
         self.schemes_table._del_scheme(scheme_name=scheme_name)
     
-    def add_user(self, user_name: str,
-                 password: str) -> None:
-        if not self.current_user_privileges.ADD_USER:
-            raise NotEnoughPrivileges
-        
-        new_user: User = User(name=user_name)
-        new_user.set_password(password=password)
-        self.user_scheme.add_user(user=new_user)
-        self.privileges_scheme.add_privileges(user=new_user,
-                                              privileges=Privileges())
     
-    def delete_user(self, user: User) -> None:
-        if not self.current_user_privileges.DEL_USER:
-            raise NotEnoughPrivileges
-        
-        self.user_scheme.remove_user(user=user)
         
