@@ -1,9 +1,9 @@
-from src.database import Database, Data, Scheme
+from src.database import Database, Scheme, Data
 from src.data_models import types, booleans
 from src.exceptions import *
-from src.user import User, UserScheme
-from src.privileges import Privileges
-from src.dumper import save, load, save_generic
+from src.user import User, UserScheme, calculate_sha256
+from src.privileges import PrivilegesScheme, Privileges
+from src.dumper import load, save_generic
 from src.logger import Logger
 from src.commands import Commands
 from queue import Queue
@@ -141,13 +141,23 @@ class Parser:
             'username': command_args[0],
             'password': command_args[1]
         }
-
-    
+        
+    @staticmethod 
+    def parse_del_scheme(command_args: list) -> dict:
+        if len(command_args) != 1:
+            Logger.print_log_error('Invalid number of arguments for use_database command', 'parse_use_database')
+            return
+        
+        return {
+            'scheme_name': command_args[0]
+        }
+   
 class Interpreter(Thread):
     def __init__(self) -> None:
         super().__init__()
         self.user_scheme: UserScheme = UserScheme()
         self._user: User = None
+        self.privileges_scheme: PrivilegesScheme = PrivilegesScheme()
         
         self._messages: Queue = Queue()
         self._data_bases: Databases = Databases()
@@ -168,6 +178,17 @@ class Interpreter(Thread):
             self.interpretate(command_name=command_name,
                                 args=args)
     
+    def check_root(self) -> None:
+        if not self._user in self.privileges_scheme.get_all_users() and self._user.name == 'root':
+            root_privileges = Privileges()
+            root_privileges.make_root()
+            
+            self.privileges_scheme.add_privilege(user=self._user,
+                                                  privileges=root_privileges)
+        
+        if self._user.password == calculate_sha256('root'):
+            Logger.print_log_warning('change root password for better security.')
+
     def add_user(self, user_name: str,
                  password: str) -> None:
         if not self.current_user_privileges.ADD_USER:
@@ -261,10 +282,27 @@ class Interpreter(Thread):
                 self._user = self.user_scheme.get_user(name=parsed['username'],
                                                        password=parsed['password'])
                 
-                return
+                self.check_root()
                 
+                return
+               
             if self._user is None:
                 Logger.print_log_error('Must login', 'core')
+                return
+
+            elif command_name == COMM.LOGOUT[0]:
+                self._user = None
+                return
+            
+            elif command_name == COMM.SHOW_USERS[0]:
+                if not self.privileges_scheme.get_privileges(user=self._user).READ_PRIVILEGE:
+                    raise NotEnoughPrivileges
+                
+                users: list[User] = self.user_scheme.get_all_users()
+                msg: list[str] = [user.name for user in users]
+                
+                self._messages.put(msg)
+
                 return
             
             if command_name == COMM.HELP[0]:
@@ -368,6 +406,11 @@ class Interpreter(Thread):
                     
             elif command_name == COMM.SHOW_SCHEMES[0]:
                 Thread(target=self.get_schemes_name, daemon=True).start()
+                    
+            elif command_name == COMM.DEL_SCHEME[0]:
+                parsed: dict = Parser.parse_del_scheme(args)
+                
+                self._current_db.delete_scheme(parsed['scheme_name'])
                     
             elif command_name == COMM.GET_ALL_REGISTRY[0]:
                 Thread(target=self.get_all_schemes, daemon=True).start()
