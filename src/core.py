@@ -8,12 +8,25 @@ from src.logger import Logger
 from src.commands import Commands
 from queue import Queue
 from threading import Thread
+from typing import Callable
 import os
 import json
 
 COMM: Commands = Commands()
 
 Logger.print_log_normal(log='Database started succesfully', instance='main')
+
+class Instances:
+    auth: str = 'Auth'
+    user_management: str = 'User management'
+    database_management: str = 'Database management'
+    database_exception: str = 'Database Exception'
+    scheme_management: str = 'Scheme management'
+    scheme_exception: str = 'Scheme Exception'
+    registry_management: str = 'Registry management'
+    registry_exception: str = 'Registry Exception'
+    help: str = 'Help'
+    debug: str = 'Debug'
 
 class Databases:
     def __init__(self) -> None:
@@ -152,16 +165,36 @@ class Parser:
             'scheme_name': command_args[0]
         }
    
+class InterpreterType:
+    server: str = 'server'
+    command_line: str = 'command_line'
+
 class Interpreter(Thread):
-    def __init__(self) -> None:
+    def __init__(self, type: InterpreterType) -> None:
         super().__init__()
+        """
+        Interpreter Type is used to determine
+        how the IO of the interpreter will work. 
+        """
+        self.type: str = type
+        self.command: str | None =  None
+        self.command_queue: Queue = Queue()
+        self.server_output_callback: Callable[[str]] = None
+        
+        """
+        Interpreter IO
+        """
+        self._messages: Queue = Queue()
+        self._data_bases: Databases = Databases()
+        self._current_db: Database | None = None
+        
+        """
+        Creates the schemes to manage the users.
+        """
         self.user_scheme: UserScheme = UserScheme()
         self._user: User = None
         self.privileges_scheme: PrivilegesScheme = PrivilegesScheme()
         
-        self._messages: Queue = Queue()
-        self._data_bases: Databases = Databases()
-        self._current_db: Database | None = None
         
         Thread(target=self.output_thread, daemon=True).start()
         
@@ -169,15 +202,40 @@ class Interpreter(Thread):
         
     def run(self) -> None:
         while True:
-            command_args: list = input('\n> ').split(' ')
-            
-            command_name: str = command_args[0]
-            
-            args: list = command_args[1:]
-            
-            self.interpretate(command_name=command_name,
-                                args=args)
+            if self.type == InterpreterType.command_line:
+                self.command: list = input('\n> ').split(' ')
+                
+                command_name: str = self.command[0]
+                
+                args: list = self.command[1:]
+                
+                self.interpretate(command_name=command_name,
+                                    args=args)
+            elif self.type == InterpreterType.server:
+                while not self.command_queue.empty():   
+                    command = self.command_queue.get()
+                    
+                    command_name: str = command[0]
+                    
+                    args: list = command[1:]
+                    
+                    self.interpretate(command_name=command_name,
+                                    args=args)
     
+    def add_command_task(self, command: str) -> None:
+        if self.type == InterpreterType.server:
+            self.command_queue.put(command)
+            return
+        
+        Logger.print_log_error('Interpreter type is not server', 'add_command_task')
+        
+    def set_output_callback(self, callback: Callable) -> None:
+        if self.type == InterpreterType.server:
+            self.server_output_callback = callback
+            return
+        
+        Logger.print_log_error('Interpreter type is not server', 'add_command_task')
+            
     def check_root(self) -> None:
         if not self._user in self.privileges_scheme.get_all_users() and self._user.name == 'root':
             root_privileges = Privileges()
@@ -208,39 +266,46 @@ class Interpreter(Thread):
 
     def get_schemes_name(self) -> None:
         if self._current_db == None:
+            self.load_msg('Database not selected', Instances.database_exception)
             Logger.print_log_error('Database not selected', 'get_all_schemes')
             return
         
-        self._messages.put(str(list(self._current_db.schemes_table._schemes.keys())))
+        self.load_msg(str(list(self._current_db.schemes_table._schemes.keys())), Instances.scheme_management)
     
     def get_registry(self, scheme_name: str, key: str) -> None:
         if self._current_db == None:
-            Logger.print_log_error('Database not setted', 'get_registry')
+            self.load_msg('Database not selected', Instances.database_exception)
+            Logger.print_log_error('Database not setted', Instances.database_exception)
             return
         try:
-            self._messages.put(self._current_db.get_registry(scheme_name, key))        
+            self.load_msg(self._current_db.get_registry(scheme_name, key), Instances.registry_exception)      
         except KeyNotFound:
-            Logger.print_log_error(f'Key {key} does not exist', 'get_registry')
+            self.load_msg(f'Key {key} does not exist', Instances.registry_exception)
+            Logger.print_log_error(f'Key {key} does not exist', Instances.registry_exception)
             return
         except InvalidSchemeName:
-            Logger.print_log_error(f'Scheme {scheme_name} does not exist', 'get_registry')
+            self.load_msg(f'Scheme {scheme_name} does not exist', Instances.scheme_exception)
+            Logger.print_log_error(f'Scheme {scheme_name} does not exist', Instances.scheme_exception)
             return
         
     def get_all_schemes(self) -> None:
         if self._current_db == None:
-            Logger.print_log_error('Database not setted', 'get_all_schemes')
+            self.load_msg('Database not selected', Instances.database_exception)
+            Logger.print_log_error('Database not setted', Instances.database_exception)
             return
         
-        self._messages.put(str(self._current_db.read_all_schemes()))
+        self.load_msg(str(self._current_db.read_all_schemes()), Instances.scheme_management)
     
     def output_thread(self) -> None:
         while True:
-            if not self._messages.empty():
+            if not self._messages.empty() and self.type == InterpreterType.command_line:
                 if self._current_db != None:
                     Logger.print_database_output(self._current_db.db_name, self._messages.get())
                 else:
                     Logger.print_database_output('', self._messages.get())
-    
+            elif not self._messages.empty() and self.type == InterpreterType.server:
+                self.server_output_callback(self._messages.get())
+            
     def save_databases_stack(self) -> None:
         internal_path = os.path.join(os.getcwd(), 'internal', 'core.property')
         
@@ -268,6 +333,11 @@ class Interpreter(Thread):
         if self._current_db is not None:
             self._current_db.close()
     
+    def load_msg(self, message: str, instance: str) -> None:
+        new_message: str = f'{instance}\t{message}'
+        
+        self._messages.put(new_message)
+    
     def interpretate(self, command_name: str, args: list) -> None:
         try:
             if command_name == COMM.EXIT[0]:
@@ -287,11 +357,13 @@ class Interpreter(Thread):
                 return
                
             if self._user is None:
+                self.load_msg('Must login', Instances.auth)
                 Logger.print_log_error('Must login', 'core')
                 return
 
             elif command_name == COMM.LOGOUT[0]:
                 self._user = None
+                self.load_msg(f'Logged out as {self._user.name}', Instances.auth)
                 return
             
             elif command_name == COMM.SHOW_USERS[0]:
@@ -301,38 +373,44 @@ class Interpreter(Thread):
                 users: list[User] = self.user_scheme.get_all_users()
                 msg: list[str] = [user.name for user in users]
                 
-                self._messages.put(msg)
+                self.load_msg(str(msg), Instances.user_management)
 
                 return
             
             if command_name == COMM.HELP[0]:
-                COMM.show_help()
-            
+                self.load_msg(COMM.show_help(), Instances.help)
+                    
             elif command_name == COMM.CLEAR[0]:
                 os.system('cls' if os.name == 'nt' else 'clear')
                 return
             
             elif command_name == COMM.DEBUG[0]:
-                self._messages.put('DEBUG')           
+                self.load_msg('DEBUG MESSAGE', Instances.debug)
             # Here below are all the database control commands
             
             elif command_name == COMM.CREATE_DB[0]:
                 parsed: dict = Parser.parse_add_new_database(args)
+                db_name: str = parsed['name']
                 
                 if parsed is None:
                     return
                 
-                Database(db_name = parsed['name'], user=self._user).close()
+                Database(db_name = db_name, user=self._user).close()
+                
+                self.load_msg(f'Database with name: {db_name} created succesfully', Instances.database_management)
                 
             elif command_name == COMM.USE_DB[0]:
                 parsed: dict = Parser.parse_use_database(args)
+                db_name: str = parsed['name']
                 
                 databases: Databases = Databases()
                 
                 if parsed is None:
                     DatabaseDoesNotExist # change this
+                    return
                 
-                if not parsed['name'] in databases.databases:
+                if not db_name in databases.databases:
+                    self.load_msg(f'Database with name: {db_name} does not exist', Instances.database_exception)
                     raise DatabaseDoesNotExist
                 
                 if self._current_db is not None:
@@ -340,32 +418,37 @@ class Interpreter(Thread):
 
                 self._current_db = self._data_bases.get_database(database_name=parsed['name'],
                                                                  user=self._user)
-            
+
+                self.load_msg(f'Database with name: {db_name} selected', Instances.database_management)
+                
             elif command_name == COMM.SHOW_DATABASES[0]:
-                available_databases: str = '\nAvailable databases: '
+                available_databases: str = 'Available databases: '
                 
                 databases: Databases = Databases()                
                 
                 for database_name in databases.databases:
-                    available_databases += f'\n{database_name}'
+                    available_databases += f'\t{database_name}'
                 
-                self._messages.put(available_databases)
+                self.load_msg(available_databases, Instances.database_management)
                  
             # Here below all the scheme and registry control commands are implemented
             elif command_name == COMM.CREATE_SCHEME[0]:
                 parsed: dict =  Parser.parse_add_scheme_command(args)
-
+                scheme_name: str = parsed['name']
+                
                 if parsed is None:
                     return
                 
                 if self._current_db is None:
                     raise DatabaseDoNotSelected
                 
-                self._current_db.add_scheme(parsed['name'],
+                self._current_db.add_scheme(scheme_name,
                                     parsed['type1'],
                                     parsed['type2'],
                                     parsed['overwrite'],
                                     parsed['size'])
+                
+                self.load_msg(f'Scheme with name: {scheme_name} created succesfully', Instances.scheme_management)
                     
             elif command_name == COMM.INSERT_INTO[0]:
                 parsed: list = Parser.parse_set_registry_command(args)
@@ -385,8 +468,6 @@ class Interpreter(Thread):
                 
                 key_type, value_type = scheme._key_type, scheme._vals_type
                 
-                Logger.print_log_debug(f'Key type: {key_type}, value type: {value_type}')
-                
                 try:
                     if key_type == dict:
                         parsed['key'] = json.loads(parsed['key'])
@@ -398,19 +479,24 @@ class Interpreter(Thread):
                     else:
                         parsed['value'] = value_type(parsed['value'])
                 except:
-                    Logger.print_log_error(f'Invalid type for key or value', 'set_registry')
+                    self.load_msg('Invalid type for key or value', Instances.registry_exception)
                     return
                 
                 self._current_db.insert_into_scheme(parsed['scheme'],
                                             Data(parsed['key'], parsed['value']))
+                
+                self.load_msg(...)
                     
             elif command_name == COMM.SHOW_SCHEMES[0]:
                 Thread(target=self.get_schemes_name, daemon=True).start()
                     
             elif command_name == COMM.DEL_SCHEME[0]:
                 parsed: dict = Parser.parse_del_scheme(args)
+                scheme_name: str = parsed['scheme_name']
                 
-                self._current_db.delete_scheme(parsed['scheme_name'])
+                self._current_db.delete_scheme(scheme_name)
+                
+                self.load_msg(f'Scheme with name: {scheme_name} deleted succesfully', Instances.scheme_management)
                     
             elif command_name == COMM.GET_ALL_REGISTRY[0]:
                 Thread(target=self.get_all_schemes, daemon=True).start()

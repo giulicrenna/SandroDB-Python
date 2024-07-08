@@ -55,8 +55,11 @@ class Commands:
         
         self.SHOW_PERMISSION: tuple[str, str] = ('show_permission', 'Show user permission.')
 
-    def show_help(self) -> None:
+    def show_help(self) -> str:
         Logger.print_database_output("HELP", "Showing available commands.")
+        help: str = '' 
         for cmd_name, cmd_desc in self.__dict__.values():
-            print(f"\t* {cmd_name} -> {cmd_desc}")
+            comm: str = f"\t* {cmd_name} -> {cmd_desc}"
+            help += comm
         
+        return help

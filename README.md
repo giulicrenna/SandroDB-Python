@@ -26,6 +26,159 @@ pip install -r requirements.txt
 
 ### Usage
 
+### System Commands
+
+1. **`exit`**
+   - **Description**: Close database engine.
+   - **Usage**: `exit`
+
+2. **`clear`**
+   - **Description**: Clear the screen.
+   - **Usage**: `clear`
+
+3. **`help`**
+   - **Description**: Show help.
+   - **Usage**: `help`
+
+4. **`debug`**
+   - **Description**: 
+   - **Usage**: `debug`
+
+### Database Commands
+
+1. **`create_db`**
+   - **Description**: Creates a new database.
+   - **Arguments**:
+     - `name` `<str>`: Name of the database.
+   - **Usage**: `create_db [name]`
+
+2. **`use_db`**
+   - **Description**: Select database to use.
+   - **Arguments**:
+     - `name` `<str>`: Name of the database.
+   - **Usage**: `use_db [name]`
+
+3. **`show_databases`**
+   - **Description**: Show available databases.
+   - **Usage**: `show_databases`
+
+4. **`exit_db`**
+   - **Description**: Close the selected database.
+   - **Arguments**:
+     - `name` `<str>`: Name of the database.
+   - **Usage**: `exit_db [name]`
+
+### Scheme Commands
+
+1. **`create_scheme`**
+   - **Description**: Creates a new scheme.
+   - **Arguments**:
+     - `name` `<str>`: Name of the scheme.
+     - `type1` `<type>`: First type.
+     - `type2` `<type>`: Second type.
+     - `overwrite registry` `<bool>`: Overwrite registry flag.
+     - `size` `<int>`: Size of the scheme.
+   - **Usage**: `create_scheme [name] [type1] [type2] [overwrite registry] [size]`
+
+2. **`show_schemes`**
+   - **Description**: Show all available schemes in selected database.
+   - **Usage**: `show_schemes`
+
+3. **`del_scheme`**
+   - **Description**: Delete scheme.
+   - **Arguments**:
+     - `name` `<str>`: Name of the scheme.
+   - **Usage**: `del_scheme [name]`
+
+### Registry Commands
+
+1. **`insert_into`**
+   - **Description**: Inserts a new record into a scheme.
+   - **Arguments**:
+     - `scheme name` `<str>`: Name of the scheme.
+     - `key` `<any>`: Key of the record.
+     - `value` `<any>`: Value of the record.
+   - **Usage**: `insert_into [scheme name] [key] [value]`
+
+2. **`get_registry`**
+   - **Description**: Gets a record from a scheme.
+   - **Arguments**:
+     - `scheme name` `<str>`: Name of the scheme.
+     - `key` `<any>`: Key of the record.
+   - **Usage**: `get_registry [scheme name] [key]`
+
+3. **`get_all_registry`**
+   - **Description**: Gets all records from a scheme.
+   - **Arguments**:
+     - `scheme name` `<str>`: Name of the scheme.
+   - **Usage**: `get_all_registry [scheme name]`
+
+4. **`del_registry`**
+   - **Description**: Deletes a record from a scheme.
+   - **Arguments**:
+     - `scheme name` `<str>`: Name of the scheme.
+     - `key` `<any>`: Key of the record.
+   - **Usage**: `del_registry [scheme name] [key]`
+
+5. **`update_registry`**
+   - **Description**: Updates a record in a scheme.
+   - **Arguments**:
+     - `scheme name` `<str>`: Name of the scheme.
+     - `key` `<any>`: Key of the record.
+     - `value` `<any>`: New value of the record.
+   - **Usage**: `update_registry [scheme name] [key] [value]`
+
+### User Commands
+
+1. **`login`**
+   - **Description**: Login to the database.
+   - **Arguments**:
+     - `username` `<str>`: Username.
+     - `password` `<str>`: Password.
+   - **Usage**: `login [username] [password]`
+
+2. **`logout`**
+   - **Description**: Logout from the database.
+   - **Usage**: `logout`
+
+3. **`show_users`**
+   - **Description**: Shows users in the selected database.
+   - **Usage**: `show_users`
+
+4. **`register`**
+   - **Description**: Register a new user into the selected database.
+   - **Arguments**:
+     - `username` `<str>`: Username.
+     - `password` `<str>`: Password.
+   - **Usage**: `register [username] [password]`
+
+5. **`del_user`**
+   - **Description**: Delete user.
+   - **Arguments**:
+     - `username` `<str>`: Username.
+   - **Usage**: `del_user [username]`
+
+6. **`change_password`**
+   - **Description**: Change user password.
+   - **Arguments**:
+     - `username` `<str>`: Username.
+     - `new password` `<str>`: New password.
+     - `old password` `<str>`: Old password.
+   - **Usage**: `change_password [username] [new password] [old password]`
+
+7. **`change_permission`**
+   - **Description**: Change user permission.
+   - **Arguments**:
+     - `username` `<str>`: Username.
+     - `permission` `<str>`: Permission type.
+     - `value` `<bool>`: Permission value.
+   - **Usage**: `change_permission [username] [permission] [value]`
+
+8. **`show_permission`**
+   - **Description**: Show user permissions.
+   - **Usage**: `show_permission`
+
+
 #### Creating a Database
 
 ```python

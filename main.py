@@ -1,7 +1,4 @@
-from src.database import Database
-from src.data_models import types, booleans
-from src.exceptions import *
-from src.core import Interpreter
+from src.core import Interpreter, InterpreterType
 from src.logger import Logger
 import atexit
 
@@ -16,7 +13,7 @@ insert_into cars audi 123
 insert_into users2 hola {"key1": "value1", "key2": "value2", "key3": "value3"}
 """
 
-interpreter: Interpreter = Interpreter()
+interpreter: Interpreter = Interpreter(type=InterpreterType.command_line)
 interpreter.start()
 
 def at_exit() -> None:
