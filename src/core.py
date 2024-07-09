@@ -8,7 +8,7 @@ from src.logger import Logger
 from src.commands import Commands
 from queue import Queue
 from threading import Thread
-from typing import Callable
+from typing import Callable, Tuple, Dict
 import os
 import json
 
@@ -168,31 +168,62 @@ class Parser:
 class InterpreterType:
     server: str = 'server'
     command_line: str = 'command_line'
+    
+class VirtualMemory:
+    def __init__(self) -> None:
+        self.connections: Dict[int, Database] = {}
+        
+    def get_database_from_uuid(self, conn_id: int) -> Database:
+        if conn_id not in self.connections.keys():
+            self.connections[conn_id] = None
+            return
+        
+        return self.connections[conn_id]
 
+    def add_conn_id(self, conn_id: int) -> None:
+        if conn_id not in self.connections.keys():
+            self.connections[conn_id] = None
+            return
+    
+    def change_database_state(self, conn_id: int, database: Database) -> None:
+        self.connections[conn_id] = database
+        return
+    
 class Interpreter(Thread):
-    def __init__(self, type: InterpreterType) -> None:
+    def __init__(self, type: str,
+                 virtual_memory: VirtualMemory,
+                 conn_id: int) -> None:
+        """
+        Atributes starting with a _ won't be saved
+        """
         super().__init__()
         """
         Interpreter Type is used to determine
         how the IO of the interpreter will work. 
-        """
-        self.type: str = type
-        self.command: str | None =  None
-        self.command_queue: Queue = Queue()
-        self.server_output_callback: Callable[[str]] = None
         
+        _command_queue has elements of the type Tuple[Tuple[str, str], str]:
+            - Command and args.
+            - UUID
+        """
+        self._type: str = type
+        self._command: str | None =  None
+        self._command_queue: Queue = Queue()
+        self._server_output_callback: Callable[[str]] = None
+        self._should_stop: bool = False
         """
         Interpreter IO
         """
         self._messages: Queue = Queue()
         self._data_bases: Databases = Databases()
-        self._current_db: Database | None = None
+        self.conn_id = conn_id
+        self.virtual_memory: VirtualMemory = virtual_memory
+        self._current_db: Database = self.virtual_memory.get_database_from_uuid(self.conn_id)
         
         """
         Creates the schemes to manage the users.
         """
-        self.user_scheme: UserScheme = UserScheme()
         self._user: User = None
+        self.user_scheme: UserScheme = UserScheme()
         self.privileges_scheme: PrivilegesScheme = PrivilegesScheme()
         
         
@@ -201,40 +232,45 @@ class Interpreter(Thread):
         self.load_state()
         
     def run(self) -> None:
-        while True:
-            if self.type == InterpreterType.command_line:
-                self.command: list = input('\n> ').split(' ')
-                
-                command_name: str = self.command[0]
-                
-                args: list = self.command[1:]
-                
-                self.interpretate(command_name=command_name,
-                                    args=args)
-            elif self.type == InterpreterType.server:
-                while not self.command_queue.empty():   
-                    command = self.command_queue.get()
+        while True and not self._should_stop:
+            try:
+                if self._type == InterpreterType.command_line:
+                    self._command: list = input('\n> ').split(' ')
                     
-                    command_name: str = command[0]
+                    command_name: str = self._command[0]
                     
-                    args: list = command[1:]
+                    args: list = self._command[1:]
                     
                     self.interpretate(command_name=command_name,
-                                    args=args)
-    
+                                        args=args)
+                elif self._type == InterpreterType.server:
+                    while not self._command_queue.empty():   
+                        command: Tuple[str, str] = self._command_queue.get()
+                        
+                        command_name: str = command[0]
+                        
+                        args: list = command[1:]
+                        
+                        self.interpretate(command_name=command_name,
+                                        args=args)
+            except Exception as e:
+                Logger.print_log_error(str(e),'Main Thread')
+                self.save_databases_stack()
+                self._should_stop = True
+            
     def add_command_task(self, command: str) -> None:
-        if self.type == InterpreterType.server:
-            self.command_queue.put(command)
+        if self._type == InterpreterType.server:
+            self._command_queue.put(command.split(' '))
             return
         
-        Logger.print_log_error('Interpreter type is not server', 'add_command_task')
+        Logger.print_log_error('Interpreter type is not a server', 'add_command_task')
         
     def set_output_callback(self, callback: Callable) -> None:
-        if self.type == InterpreterType.server:
-            self.server_output_callback = callback
+        if self._type == InterpreterType.server:
+            self._server_output_callback = callback
             return
         
-        Logger.print_log_error('Interpreter type is not server', 'add_command_task')
+        Logger.print_log_error('Interpreter type is not server', 'set_output_callback')
             
     def check_root(self) -> None:
         if not self._user in self.privileges_scheme.get_all_users() and self._user.name == 'root':
@@ -298,13 +334,14 @@ class Interpreter(Thread):
     
     def output_thread(self) -> None:
         while True:
-            if not self._messages.empty() and self.type == InterpreterType.command_line:
+            if not self._messages.empty() and self._type == InterpreterType.command_line:
                 if self._current_db != None:
-                    Logger.print_database_output(self._current_db.db_name, self._messages.get())
+                    Logger.print_database_output(self._current_db.db_name, self._messages.get()[0])
                 else:
                     Logger.print_database_output('', self._messages.get())
-            elif not self._messages.empty() and self.type == InterpreterType.server:
-                self.server_output_callback(self._messages.get())
+            elif not self._messages.empty() and self._type == InterpreterType.server:
+                message: Tuple[str, str] = self._messages.get()
+                self._server_output_callback(message, self.conn_id)
             
     def save_databases_stack(self) -> None:
         internal_path = os.path.join(os.getcwd(), 'internal', 'core.property')
@@ -314,7 +351,7 @@ class Interpreter(Thread):
         for key in list(state.keys()):
             if key[0] == '_':
                 del(state[key])
-        
+
         save_generic(internal_path, state)
     
     def load_state(self):
@@ -330,29 +367,38 @@ class Interpreter(Thread):
         Logger.print_log_warning('Closing database')
         
         self.save_databases_stack()
+        
         if self._current_db is not None:
             self._current_db.close()
     
     def load_msg(self, message: str, instance: str) -> None:
-        new_message: str = f'{instance}\t{message}'
+        new_message: str = f'[{instance}]\t{message}\n'
         
         self._messages.put(new_message)
     
     def interpretate(self, command_name: str, args: list) -> None:
         try:
             if command_name == COMM.EXIT[0]:
-                exit(0)
+                self.save_databases_stack()
+        
+                if self._current_db is not None:
+                    self._current_db.close()
                 
+                exit(0)
+
             if command_name == COMM.LOGIN[0]:
                 parsed: dict = Parser.parse_login(args)
                 
                 if parsed is None:
                     return
                 
-                self._user = self.user_scheme.get_user(name=parsed['username'],
+                username: str = parsed['username']
+                self._user = self.user_scheme.get_user(name=username,
                                                        password=parsed['password'])
                 
                 self.check_root()
+
+                self.load_msg(f'Login as {username}', Instances.auth)
                 
                 return
                
@@ -416,9 +462,14 @@ class Interpreter(Thread):
                 if self._current_db is not None:
                     self._current_db.close()                
 
-                self._current_db = self._data_bases.get_database(database_name=parsed['name'],
+                new_db: Database = self._data_bases.get_database(database_name=parsed['name'],
                                                                  user=self._user)
 
+                self.virtual_memory.change_database_state(conn_id=self.conn_id,
+                                                          database=new_db)
+                
+                self._current_db = self.virtual_memory.get_database_from_uuid(conn_id=self.conn_id)
+                
                 self.load_msg(f'Database with name: {db_name} selected', Instances.database_management)
                 
             elif command_name == COMM.SHOW_DATABASES[0]:
@@ -508,7 +559,7 @@ class Interpreter(Thread):
                     return
                 
                 Thread(target=self.get_registry,
-                    args=(parsed['scheme'], parsed['key']),
+                    args=(parsed['scheme'], parsed['key'],),
                     daemon=True).start()               
             
             else:

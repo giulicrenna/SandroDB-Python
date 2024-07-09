@@ -1,6 +1,6 @@
 from src.core import Interpreter, InterpreterType
 from src.logger import Logger
-import atexit
+from uuid import uuid4
 
 """
 create_scheme users str str True 1024
@@ -15,9 +15,3 @@ insert_into users2 hola {"key1": "value1", "key2": "value2", "key3": "value3"}
 
 interpreter: Interpreter = Interpreter(type=InterpreterType.command_line)
 interpreter.start()
-
-def at_exit() -> None:
-    Logger.print_log_normal('Closing database', 'main')
-    interpreter.at_close()
-
-atexit.register(at_exit)
