@@ -12,6 +12,8 @@ from typing import Callable, Tuple, Dict
 import os
 import json
 
+AUTHOR: str = 'Giuliano Crenna'
+
 COMM: Commands = Commands()
 
 Logger.print_log_normal(log='Database started succesfully', instance='main')
