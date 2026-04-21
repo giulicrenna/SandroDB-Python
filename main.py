@@ -1,17 +1,13 @@
-from src.core import Interpreter, InterpreterType
-from src.logger import Logger
-from uuid import uuid4
+from src.core import Interpreter, InterpreterType, VirtualMemory
 
-"""
-create_scheme users str str True 1024
-create_scheme clients str str True 1024
-create_scheme cars str str False 1024
-show_schemes
-insert_into users usuario1 123
-insert_into clients usuario1 123
-insert_into cars audi 123
-insert_into users2 hola {"key1": "value1", "key2": "value2", "key3": "value3"}
-"""
+virtual_memory: VirtualMemory = VirtualMemory()
+conn_id: int = 0
 
-interpreter: Interpreter = Interpreter(type=InterpreterType.command_line)
+virtual_memory.add_conn_id(conn_id)
+
+interpreter: Interpreter = Interpreter(
+    type=InterpreterType.command_line,
+    virtual_memory=virtual_memory,
+    conn_id=conn_id,
+)
 interpreter.start()

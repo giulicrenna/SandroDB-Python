@@ -43,6 +43,9 @@ class PrivilegesScheme:
     
     def get_all_users(self) -> List[User]:
         return [user for user, _ in self.privileges]
+
+    def get_all_users_names(self) -> List[str]:
+        return [user.name for user, _ in self.privileges]
     
     def add_privilege(self, user: User, privileges: Privileges) -> None:
         if user in self.get_all_users():

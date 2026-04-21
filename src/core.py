@@ -35,7 +35,14 @@ class Databases:
         self.databases: dict = self.load_databases()
 
     def load_databases(self) -> list[str]:
-        return [db.split('.')[0] for db in os.listdir(os.path.join(os.getcwd(), 'internal')) if db != 'core.property']
+        sandro_dir = os.path.join(os.getcwd(), '.sandro')
+        if not os.path.isdir(sandro_dir):
+            return []
+        return [
+            db.rsplit('.', 1)[0]
+            for db in os.listdir(sandro_dir)
+            if db.endswith('.SDB')
+        ]
 
     def get_database(self, database_name: str, user: User) -> Database:
         if database_name not in self.databases:
@@ -346,7 +353,7 @@ class Interpreter(Thread):
                 self._server_output_callback(message, self.conn_id)
             
     def save_databases_stack(self) -> None:
-        internal_path = os.path.join(os.getcwd(), 'internal', 'core.property')
+        internal_path = os.path.join(os.getcwd(), '.sandro', 'core.property')
         
         state = self.__dict__.copy()
         
@@ -357,7 +364,7 @@ class Interpreter(Thread):
         save_generic(internal_path, state)
     
     def load_state(self):
-        file_path: str = os.path.join('internal', 'core.property')
+        file_path: str = os.path.join('.sandro', 'core.property')
         
         if not  os.path.isfile(file_path): return
          
@@ -410,8 +417,9 @@ class Interpreter(Thread):
                 return
 
             elif command_name == COMM.LOGOUT[0]:
+                logged_out_name = self._user.name
                 self._user = None
-                self.load_msg(f'Logged out as {self._user.name}', Instances.auth)
+                self.load_msg(f'Logged out as {logged_out_name}', Instances.auth)
                 return
             
             elif command_name == COMM.SHOW_USERS[0]:
@@ -438,10 +446,11 @@ class Interpreter(Thread):
             
             elif command_name == COMM.CREATE_DB[0]:
                 parsed: dict = Parser.parse_add_new_database(args)
-                db_name: str = parsed['name']
-                
+
                 if parsed is None:
                     return
+
+                db_name: str = parsed['name']
                 
                 Database(db_name = db_name, user=self._user).close()
                 
@@ -449,13 +458,13 @@ class Interpreter(Thread):
                 
             elif command_name == COMM.USE_DB[0]:
                 parsed: dict = Parser.parse_use_database(args)
-                db_name: str = parsed['name']
-                
-                databases: Databases = Databases()
-                
+
                 if parsed is None:
-                    DatabaseDoesNotExist # change this
                     return
+
+                db_name: str = parsed['name']
+
+                databases: Databases = Databases()
                 
                 if not db_name in databases.databases:
                     self.load_msg(f'Database with name: {db_name} does not exist', Instances.database_exception)
@@ -486,11 +495,12 @@ class Interpreter(Thread):
                  
             # Here below all the scheme and registry control commands are implemented
             elif command_name == COMM.CREATE_SCHEME[0]:
-                parsed: dict =  Parser.parse_add_scheme_command(args)
-                scheme_name: str = parsed['name']
-                
+                parsed: dict = Parser.parse_add_scheme_command(args)
+
                 if parsed is None:
                     return
+
+                scheme_name: str = parsed['name']
                 
                 if self._current_db is None:
                     raise DatabaseDoNotSelected
@@ -545,8 +555,12 @@ class Interpreter(Thread):
                     
             elif command_name == COMM.DEL_SCHEME[0]:
                 parsed: dict = Parser.parse_del_scheme(args)
+
+                if parsed is None:
+                    return
+
                 scheme_name: str = parsed['scheme_name']
-                
+
                 self._current_db.delete_scheme(scheme_name)
                 
                 self.load_msg(f'Scheme with name: {scheme_name} deleted succesfully', Instances.scheme_management)
@@ -647,27 +661,11 @@ class Interpreter(Thread):
         except KeyboardInterrupt:
             Logger.print_log_normal('Keyboard interrupt', 'interpretate')
             exit()
-        
+
         except DatabaseDoNotSelected:
             Logger.print_log_error(f'Database not selected', 'interpretate')
-            return
-        
-        except DatabaseDoesNotExist:
-            Logger.print_log_error(f'Database does not exist', 'interpretate')
             return
 
-        except KeyError:
-            Logger.print_log_error(f'Bad command usage, check help.', 'interpretate')
-            return
-        
-        except KeyboardInterrupt:
-            Logger.print_log_normal('Keyboard interrupt', 'interpretate')
-            exit()
-        
-        except DatabaseDoNotSelected:
-            Logger.print_log_error(f'Database not selected', 'interpretate')
-            return
-        
         except DatabaseDoesNotExist:
             Logger.print_log_error(f'Database does not exist', 'interpretate')
             return

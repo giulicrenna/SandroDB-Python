@@ -57,7 +57,6 @@ class SchemeTable:
         self.current_user_privileges: Privileges = self.privileges_scheme.get_privileges(user=self.user)
         
         self._schemes: Dict[str, Scheme] = {"__internal__": Scheme(String, String, True, 2048)}
-        self.privileges_scheme: PrivilegesScheme = PrivilegesScheme()
             
     def _append_scheme(self, scheme_name: str, scheme: Scheme) -> None:
         if not self.current_user_privileges.ADD_SCHEME:
@@ -83,16 +82,19 @@ class SchemeTable:
     def _del_scheme(self, scheme_name: str) -> None:
         if not self.current_user_privileges.DEL_SCHEME:
             raise NotEnoughPrivileges
-        
+
+        if scheme_name not in self._schemes:
+            raise InvalidSchemeName
+
         del(self._schemes[scheme_name])
     
-    def _get_all_schemes(self) -> None:
+    def _get_all_schemes(self) -> Dict:
         if not self.current_user_privileges.GET_ALL_SCHEMES:
             raise NotEnoughPrivileges
         
         return {key: self._schemes[key]._data for key in self._schemes.keys()}
     
-    def _get_registry(self, scheme_name: str, key: any) -> None:
+    def _get_registry(self, scheme_name: str, key: any) -> any:
         if not self.current_user_privileges.READ_SCHEME:
             raise NotEnoughPrivileges
         
@@ -126,8 +128,8 @@ class Database:
         
         self.load_state()
         
-        if not os.path.isdir('internal'):
-            os.mkdir('internal')
+        if not os.path.isdir('.sandro'):
+            os.mkdir('.sandro')
         
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -135,7 +137,7 @@ class Database:
         return state
     
     def check_root(self) -> None:
-        if not "root" in self.privileges_scheme.get_all_users() and self.user.name == "root":
+        if not "root" in self.privileges_scheme.get_all_users_names() and self.user.name == "root":
             root_privileges = Privileges()
             root_privileges.make_root()
             
@@ -146,7 +148,7 @@ class Database:
             Logger.print_log_warning('change root password for better security.')
         
     def load_state(self):
-        file_path: str = os.path.join('internal', f'{self.db_name}.{FORMAT}')
+        file_path: str = os.path.join('.sandro', f'{self.db_name}.{FORMAT}')
         
         if not  os.path.isfile(file_path): return
          
@@ -166,7 +168,7 @@ class Database:
                                       data=data)
         
     def close(self) -> None:
-        save(data_file_path=os.path.join('internal', f'{self.db_name}.{FORMAT}'), database=self.__getstate__())
+        save(data_file_path=os.path.join('.sandro', f'{self.db_name}.{FORMAT}'), database=self.__getstate__())
     
     def read_all_schemes(self) -> Dict:
         return self.schemes_table._get_all_schemes()

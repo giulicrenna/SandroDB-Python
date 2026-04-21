@@ -59,7 +59,7 @@ class Commands:
         Logger.print_database_output("HELP", "Showing available commands.")
         help: str = '' 
         for cmd_name, cmd_desc in self.__dict__.values():
-            comm: str = f"\t* {cmd_name} -> {cmd_desc}"
+            comm: str = f"\t* {cmd_name} -> {cmd_desc}\n"
             help += comm
         
         return help

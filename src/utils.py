@@ -64,9 +64,7 @@ def threaded(func):
         # Create and start the thread
         thread = threading.Thread(target=target)
         thread.start()
-        
-        time.sleep(3)
-
+        thread.join()
 
         # Return the thread object and the queue
         return thread, result_queue

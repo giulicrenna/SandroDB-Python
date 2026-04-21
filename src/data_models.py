@@ -31,12 +31,12 @@ class Int:
         return self.value
     
 class String:
-    def __init__(self, value: int) -> None:
+    def __init__(self, value: str) -> None:
         if type(value) != str: raise Exception
 
         self.value: str = value
-    
-    def update_value(self, new_value: int) -> None:
+
+    def update_value(self, new_value: str) -> None:
         self.value = new_value
         
     def get_value(self) -> str:
@@ -49,7 +49,7 @@ class Array:
         if len(value) == 0:
             self.value: List[typo] = value
         else:
-            if not all([type(inside_val) for inside_val in value]):
+            if not all([type(inside_val) == typo for inside_val in value]):
                 raise Exception
             
             if len(value) > maxsize:

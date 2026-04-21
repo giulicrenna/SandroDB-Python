@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:giulicrenna.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "Bash(python -c \"from FastSocket.utils.framing import send_framed; print\\('OK'\\)\")"
+    ]
+  }
+}
